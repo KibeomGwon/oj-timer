@@ -1,0 +1,118 @@
+name: Java CI with Gradle
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      write-all
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create Docker Network
+        run: docker network create oj-timer-network  # ✅ 사용자 정의 네트워크 생성
+
+
+      - name: Get Docker Image
+        run: |
+          docker pull ggibeom/oj-timer-mysql:0.2
+
+      - name: Run MySQL Container
+        run: |
+          docker run -d \
+            --name mysql-container \
+            --network oj-timer-network \
+            -e MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }} \
+            -p 3306:3306 \
+            ggibeom/oj-timer-mysql:0.2
+
+      - name: Check MySQL Logs
+        run: docker logs mysql-container
+
+
+
+      - name: .env setting
+        run: |
+          echo "${{ secrets.ENV_FILE }}" >> ./.env
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Run Tests
+        run: ./gradlew test --info
+
+      - name: Upload Test Reports
+        uses: actions/upload-artifact@v4
+        if: failure()  # 테스트 실패 시에만 실행
+        with:
+          name: test-reports
+          path: build/reports/tests/test/
+
+      - name: Build
+        run: ./gradlew build --stacktrace
+
+
+      - name: Docker login     # 배포하기 위한 커밋 시 도커 로그인
+        if: contains(github.event.head_commit.message, '배포')
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Docker build push image  # 배포 커밋 시 도커 이미지 생성 후 이미지 푸시
+        if: contains(github.event.head_commit.message, '배포')
+        run: |
+          docker build -f Dockerfile -t ${{ secrets.DOCKER_IMAGE_NAME }} .
+          docker push ${{ secrets.DOCKER_IMAGE_NAME }}
+
+  deploy:
+    needs: build
+    if: contains(github.event.head_commit.message, '배포')
+    runs-on: ubuntu-latest
+    permissions:
+      write-all
+    steps:
+      - name: Deploy to server
+        uses: appleboy/ssh-action@master
+        id: deploy
+        with:
+          host: ${{ secrets.HOST }}
+          username: ubuntu
+          port: 22
+          key: ${{ secrets.KEY }}
+          script: |
+            sudo docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
+            cd ${{ secrets.PROJECT_PATH }}
+            
+            sudo rm ./docker-compose.yml 
+            sudo rm .env
+            sudo rm -rf default.conf
+            
+            echo "${{ secrets.DOCKER_COMPOSE }}" >> ./docker-compose.yml
+            
+            echo "${{ secrets.ENV_FILE }}" >> ./.env
+            
+            printf "%s" "${{ secrets.DEFAULT_CONF }}" > ./default.conf
+            
+            sudo docker compose down
+            
+            sudo docker container rm ${{ secrets.SERVER_NAME }} nginx-server
+            
+            sudo docker pull ${{ secrets.DOCKER_IMAGE_NAME }}
+            
+            sudo docker compose -f docker-compose.yml up -d
+
