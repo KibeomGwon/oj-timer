@@ -8,7 +8,7 @@
 <br>
 <br>
 
-spring boot, spring jpa, mysql, redis, mybatis, querydsl
+spring boot, spring jpa, mysql, redis, mybatis, querydsl, jsp
 
 <br>
 
