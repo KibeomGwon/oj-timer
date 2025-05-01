@@ -1,0 +1,78 @@
+{
+  "manifest_version": 3,
+  "name": "oj timer",
+  "version": "1.0.0",
+  "description": "A basic example extension with only required keys",
+
+  "permissions" : [
+  	"tabs",
+    "storage"
+  ],
+
+  "host_permissions": [
+    "https://solved.ac/api/v3/*",
+    "https://www.acmicpc.net/",
+    "https://school.programmers.co.kr/"
+  ],
+
+  "action" :
+  {
+    "default_popup" : "popup.html"
+  },
+
+  "background" : {
+    "service_worker" : "background.js"
+  },
+
+  "web_accessible_resources" : [
+    {
+      "matches" : [
+        "<all_urls>"
+      ],
+      "resources" : [
+        "libs/jquery-3.3.1.min.js"
+      ]
+    }
+  ],
+
+  "content_scripts" : [
+    {
+      "matches" : [
+        "https://www.acmicpc.net/*"
+      ],
+      "js" : [
+        "scripts/utils.js",
+        "scripts/authorization.js",
+        "scripts/baekjoon/variables.js",
+        "scripts/baekjoon/upload.js",
+        "scripts/baekjoon/utils.js",
+        "scripts/baekjoon/baekjoon.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches" : [
+        "https://oj-timer.site/*"
+      ],
+      "js" : [
+        "scripts/utils.js",
+        "scripts/authorization.js",
+        "scripts/mainPage.js"
+      ],
+      "run_at" : "document_idle"
+    } , 
+    {
+      "matches" : [
+        "https://school.programmers.co.kr/*"
+      ],
+      "js" : [
+        "scripts/utils.js",
+        "scripts/authorization.js",
+        "scripts/programmers/utils.js",
+        "scripts/programmers/upload.js",
+        "scripts/programmers/programmers.js"
+      ],
+      "run_at" : "document_idle"
+    }
+  ]
+}
